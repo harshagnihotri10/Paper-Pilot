@@ -1,7 +1,7 @@
 import jwt
 from datetime import datetime, timedelta
 
-SECRET_KEY = "your_secret_key"
+SECRET_KEY = "2002"
 
 def generate_jwt(user_id):
     payload = {
