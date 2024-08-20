@@ -7,6 +7,7 @@ from ai_utils import summarize_text
 from recommendations import recommend_articles
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = '2002'
 
 # Database connection helper function
 def get_db_connection():
@@ -57,10 +58,16 @@ def register_user():
         conn.close()
 
 # User login endpoint
+@app.route('/login', methods=['POST'])
 def login_user():
     data = request.get_json()
+
     email = data.get('email')
     password = data.get('password')
+
+    # Check if email and password are provided
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
 
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -81,15 +88,18 @@ def login_user():
             )
             conn.commit()
             user.pop('password_hash', None)
-            return jsonify({"status": "Login successful", "user": user, "token": token})
+            return jsonify({"status": "Login successful", "user": user, "token": token}), 200
         else:
             return jsonify({"error": "Invalid email or password"}), 401
     except Exception as e:
+        # Log the error for debugging
+        app.logger.error(f"Error during login: {str(e)}")
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal error occurred"}), 500
     finally:
         cursor.close()
         conn.close()
+
 
 # User profile update endpoint
 @app.route('/user/profile', methods=['POST'])
