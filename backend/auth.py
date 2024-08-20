@@ -1,12 +1,12 @@
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 SECRET_KEY = "2002"
 
 def generate_jwt(user_id):
     payload = {
         'user_id': user_id,
-        'exp': datetime.utcnow() + timedelta(hours=1)
+        'exp': datetime.now(timezone.utc) + timedelta(hours=1)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
