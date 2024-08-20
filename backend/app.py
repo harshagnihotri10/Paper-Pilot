@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import bcrypt
+from auth import generate_jwt, verify_jwt
+from ai_utils import summarize_text
+from recommendations import recommend_articles
 
 app = Flask(__name__)
 
@@ -54,32 +57,31 @@ def register_user():
         conn.close()
 
 # User login endpoint
-@app.route('/login', methods=['POST'])
 def login_user():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-    
+
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
+
     try:
         cursor.execute(
             'SELECT user_id, username, password_hash FROM users WHERE email = %s',
             (email,)
         )
         user = cursor.fetchone()
-        
+
         if user and check_password(password, user['password_hash'].encode('utf-8')):
+            # Generate JWT
+            token = generate_jwt(user['user_id'])
             cursor.execute(
                 'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = %s',
                 (user['user_id'],)
             )
             conn.commit()
-
             user.pop('password_hash', None)
-
-            return jsonify({"status": "Login successful", "user": user})
+            return jsonify({"status": "Login successful", "user": user, "token": token})
         else:
             return jsonify({"error": "Invalid email or password"}), 401
     except Exception as e:
@@ -375,6 +377,7 @@ def get_recommendations():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
+        # Step 1: Fetch precomputed recommendations
         cursor.execute(
             'SELECT articles.* FROM articles '
             'JOIN recommendations ON articles.article_id = recommendations.article_id '
@@ -382,12 +385,19 @@ def get_recommendations():
             (user_id,)
         )
         recommendations = cursor.fetchall()
+
+        # Step 2: Optionally enhance with real-time calculations (e.g., dynamic sorting)
+        if not recommendations:
+            # Fallback to dynamic calculation if no recommendations found
+            recommendations = recommend_articles(user_id, cursor)
+
         return jsonify({"articles": recommendations})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
         conn.close()
+
 
 if __name__ == '__main__':
     app.run(debug=True)
